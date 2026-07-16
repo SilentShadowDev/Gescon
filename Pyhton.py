@@ -67,6 +67,7 @@ if not cap.isOpened():
 screen_w, screen_h = pag.size()
 
 # Active Zone: Only map hand positions within this zone to the full screen.
+
 ACTIVE_ZONE_X_MIN = 0.15    # Left boundary  (15% from left)
 ACTIVE_ZONE_X_MAX = 0.85    # Right boundary  (85% from left)
 ACTIVE_ZONE_Y_MIN = 0.15    # Top boundary    (15% from top)
@@ -91,7 +92,7 @@ SCREENSHOT_COOLDOWN = 2.0
 
 last_type_time = 0
 TYPE_COOLDOWN = 1.0
-prev_fist = False   # Track if we were in a fist on the previous frame
+prev_fist = False   # Track if we made a fist in the previous frame
 
 # FPS counter
 fps_time = t.time()
@@ -130,14 +131,14 @@ def get_pinch_distance(hand_landmarks, tip1_id, tip2_id):
     return raw_dist
 
 def draw_status(frame, text, position=(10, 50), color=(0, 255, 255), scale=0.8):
-    """Draw status text with a dark background for readability."""
+    # Draw status text with a dark background for readability
     (text_w, text_h), _ = cv.getTextSize(text, cv.FONT_HERSHEY_SIMPLEX, scale, 2)
     x, y = position
     cv.rectangle(frame, (x - 5, y - text_h - 10), (x + text_w + 5, y + 5), (0, 0, 0), -1)
     cv.putText(frame, text, position, cv.FONT_HERSHEY_SIMPLEX, scale, color, 2)
 
 def draw_active_zone(frame, frame_h, frame_w):
-    """Draw the active tracking zone on the frame."""
+    # Draw the active tracking zone on the frame.
     x1 = int(ACTIVE_ZONE_X_MIN * frame_w)
     y1 = int(ACTIVE_ZONE_Y_MIN * frame_h)
     x2 = int(ACTIVE_ZONE_X_MAX * frame_w)
@@ -147,7 +148,8 @@ def draw_active_zone(frame, frame_h, frame_w):
 # ──────────────────────────────────────────────
 #  Main Loop
 # ──────────────────────────────────────────────
-print("\n╔══════════════════════════════════════════╗")
+print()
+print("╔══════════════════════════════════════════╗")
 print("║   Smart Hand Mouse Control System        ║")
 print("║──────────────────────────────────────────║")
 print("║   Gestures:                              ║")
@@ -159,7 +161,8 @@ print("║     • Thumb + Pinky   → Screenshot       ║")
 print("║     • Fist → Fingers  → Type letter      ║")
 print("║                                          ║")
 print("║   Press 'q' to quit                      ║")
-print("╚══════════════════════════════════════════╝\n")
+print("╚══════════════════════════════════════════╝")
+print()
 
 while True:
     ret, frame = cap.read()
@@ -172,17 +175,18 @@ while True:
     rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
     result = hands.process(rgb)
 
-    # Draw active zone guide
+    # Drawing active zone
     draw_active_zone(frame, frame_h, frame_w)
 
-    # ── FPS Counter ──
+    # FPS Counter 
     current_time = t.time()
     fps = 1 / (current_time - fps_time) if (current_time - fps_time) > 0 else 0
     fps_time = current_time
     cv.putText(frame, f"FPS: {int(fps)}", (frame_w - 120, 30), cv.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
     if result.multi_hand_landmarks:
-        # Process only the first detected hand
+        # Process only the first hand
+        # If you show 2 hands then the first one is detected and if you suddenly downs one hand then the other hand is detected.
         hand_landmarks = result.multi_hand_landmarks[0]
         mp_drawing.draw_landmarks(
             frame, hand_landmarks, mp_hands.HAND_CONNECTIONS,
@@ -190,20 +194,19 @@ while True:
             mp_drawing_styles.get_default_hand_connections_style()
         )
 
-        # ── Get Fingertip Positions ──
+        # Get Fingertip Positions 
         thumb_tip = hand_landmarks.landmark[4]
         index_tip = hand_landmarks.landmark[8]
         middle_tip = hand_landmarks.landmark[12]
         ring_tip = hand_landmarks.landmark[16]
         pinky_tip = hand_landmarks.landmark[20]
 
-        # ── Finger States: [thumb, index, middle, ring, pinky] ──
+        # Finger States: thumb, index, middle, ring, pinky 
         finger_states = get_finger_states(hand_landmarks)
         fingers_up_count = sum(finger_states[1:])  # Exclude thumb for scroll/type detection
 
-        # ══════════════════════════════════════
+    
         #  GESTURE 1: Click (Thumb + Index Pinch)
-        # ══════════════════════════════════════
         pinch_dist = get_pinch_distance(hand_landmarks, 4, 8)  # thumb tip to index tip
         
         if pinch_dist < 0.25:   # Normalized threshold (works at any distance!)
@@ -228,9 +231,9 @@ while True:
         if len(click_times) > 5:
             click_times = click_times[-2:]
 
-        # ══════════════════════════════════════
+        
         #  GESTURE 2: Cursor Movement (Index Finger)
-        # ══════════════════════════════════════
+        
         if not freeze_cursor:
             target_x, target_y = map_to_screen(index_tip.x, index_tip.y)
             
@@ -240,9 +243,9 @@ while True:
             
             pag.moveTo(int(smooth_x), int(smooth_y))
 
-        # ══════════════════════════════════════
+      
         #  GESTURE 3: Scroll Mode (All 4 fingers up)
-        # ══════════════════════════════════════
+        
         scroll_mode = (fingers_up_count == 4)
 
         if scroll_mode:
@@ -255,10 +258,10 @@ while True:
             else:
                 draw_status(frame, "SCROLL MODE", (10, 90), (200, 200, 200))
 
-        # ══════════════════════════════════════
+        
         #  GESTURE 4: Screenshot (Thumb + Pinky Pinch)
-        # ══════════════════════════════════════
-        pinky_pinch = get_pinch_distance(hand_landmarks, 4, 20)  # thumb tip to pinky tip
+        
+        pinky_pinch = get_pinch_distance(hand_landmarks, 8, 20)  # Index to pinky tip distance
         
         if pinky_pinch < 0.3 and (t.time() - last_screenshot_time) > SCREENSHOT_COOLDOWN:
             # Only trigger if index, middle, ring are UP (to avoid accidental triggers from fist)
@@ -271,22 +274,18 @@ while True:
                 draw_status(frame, f"SCREENSHOT SAVED!", (10, 130), (0, 255, 0))
                 print(f"  Screenshot saved: {filepath}")
 
-        # ══════════════════════════════════════
-        #  GESTURE 5: Type a Letter (Fist → Open fingers)
-        # ══════════════════════════════════════
-        #  Make a fist first, then open fingers to type:
-        #    Index only          → "A"
-        #    Index + Middle      → "B"
-        #    Index + Mid + Ring  → "C"
-        # ══════════════════════════════════════
-        is_fist = (fingers_up_count == 0 and not finger_states[0])
         
+        # GESTURE 5: Typing 
+        '''
+            We have added three gesture to type specific letters that are 'a','b','c'.
+        '''
+        is_fist = (fingers_up_count == 0 and not finger_states[0])
         if is_fist:
             prev_fist = True
             draw_status(frame, "FIST READY...", (10, 170), (180, 180, 180))
         
         elif prev_fist and (t.time() - last_type_time) > TYPE_COOLDOWN:
-            # Transitioned from fist to open — check which fingers opened
+            # Transition from fist to open — check which fingers opened
             if finger_states[1] and not finger_states[2] and not finger_states[3] and not finger_states[4]:
                 pag.press('a')
                 draw_status(frame, "TYPED: A", (10, 170), (255, 100, 255))
@@ -309,16 +308,16 @@ while True:
                 # If no recognized pattern, reset fist state
                 prev_fist = False
 
-        # ── Draw finger state indicator ──
+        #  Draw finger state indicator 
         state_text = "Fingers: " + "".join(["●" if f else "○" for f in finger_states])
         cv.putText(frame, state_text, (10, frame_h - 20), cv.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
 
-    # ── Display Frame ──
+    # Display Frame 
     cv.imshow("Smart Hand Mouse Control", frame)
     if cv.waitKey(1) & 0xFF == ord('q'):
         break
 
-# ── Cleanup ──
+# Cleanup
 cap.release()
 cv.destroyAllWindows()
 print("\nSession ended. Goodbye!")
