@@ -9,7 +9,7 @@
         3. Double Click        — Two quick pinches within 0.4 seconds
         4. Scroll Up           — All 4 fingers up, hand in upper zone
         5. Scroll Down         — All 4 fingers up, hand in lower zone
-        6. Screenshot          — Pinch thumb + pinky (peace sign with thumb-pinky touch)
+        6. Screenshot          — Bring all finger and thumb together.
         7. Type a Letter       — Show a fist (all fingers closed), then open specific fingers:
                                    • Index only        → types "A"
                                    • Index + Middle     → types "B"
@@ -28,30 +28,30 @@ import os
 from datetime import datetime
 from util import get_angle, get_distance, get_hand_size, get_finger_states, smooth_value
 
-# ──────────────────────────────────────────────
-#  PyAutoGUI Configuration
-# ──────────────────────────────────────────────
-pag.PAUSE = 0          # Remove the default 0.1s delay after every PyAutoGUI call (huge FPS boost)
-pag.FAILSAFE = True    # Move mouse to top-left corner to emergency-stop the script
 
-# ──────────────────────────────────────────────
+#  PyAutoGUI Configuration
+
+pag.PAUSE = 0          # Remove the default 0.1s delay after every PyAutoGUI call
+pag.FAILSAFE = True    # Move cursor to top-left corner to emergency-stop the script
+
+
 #  MediaPipe Hand Tracking Setup
-# ──────────────────────────────────────────────
+
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 
 hands = mp_hands.Hands(
-    max_num_hands=1,              # Track only one hand for stability
-    min_detection_confidence=0.8,
-    min_tracking_confidence=0.7   # Higher tracking confidence = fewer false positives
+    max_num_hands=1,              # Track only one hand 
+    min_detection_confidence=0.8,  # Area within which mediapipe renders the hand
+    min_tracking_confidence=0.7  
 )
 
-# ──────────────────────────────────────────────
+
 #  Webcam Setup
-# ──────────────────────────────────────────────
+
 cap = cv.VideoCapture(0)
-# If camera doesn't open with 0, try changing to 1 (for external / iPhone Continuity Camera)
+# If camera doesn't open with 0, try changing to 1 ( for external Webcam )
 
 cap.set(cv.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480)
@@ -62,35 +62,33 @@ if not cap.isOpened():
     print("Try changing cv.VideoCapture(0) to cv.VideoCapture(1)")
     exit()
 
-# ──────────────────────────────────────────────
+
 #  Screen & Cursor Configuration
-# ──────────────────────────────────────────────
 screen_w, screen_h = pag.size()
 
 # Active Zone: Only map hand positions within this zone to the full screen.
-# This means you don't have to reach the very edges of the camera frame.
 ACTIVE_ZONE_X_MIN = 0.15    # Left boundary  (15% from left)
 ACTIVE_ZONE_X_MAX = 0.85    # Right boundary  (85% from left)
 ACTIVE_ZONE_Y_MIN = 0.15    # Top boundary    (15% from top)
 ACTIVE_ZONE_Y_MAX = 0.85    # Bottom boundary (85% from top)
 
-# Cursor smoothing (EMA factor: lower = smoother but more laggy, higher = snappier)
+# Cursor smoothing
 SMOOTHING_FACTOR = 0.35
 smooth_x, smooth_y = screen_w // 2, screen_h // 2
 
-# ──────────────────────────────────────────────
+
 #  Gesture State Variables
-# ──────────────────────────────────────────────
+
 click_times = []
 click_cooldown = 0.5
 freeze_cursor = False
 scroll_mode = False
 
-# Screenshot cooldown (prevent rapid-fire screenshots)
+# Screenshot cooldown (prevent taking continous screenshots)
 last_screenshot_time = 0
 SCREENSHOT_COOLDOWN = 2.0
 
-# Type gesture state
+
 last_type_time = 0
 TYPE_COOLDOWN = 1.0
 prev_fist = False   # Track if we were in a fist on the previous frame
@@ -102,13 +100,10 @@ fps_time = t.time()
 SCREENSHOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "screenshots")
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 
-# ──────────────────────────────────────────────
-#  Helper Functions
-# ──────────────────────────────────────────────
 
 def map_to_screen(x, y):
     """Map hand coordinates from active zone to full screen coordinates."""
-    # Clamp to active zone
+    
     x = max(ACTIVE_ZONE_X_MIN, min(ACTIVE_ZONE_X_MAX, x))
     y = max(ACTIVE_ZONE_Y_MIN, min(ACTIVE_ZONE_Y_MAX, y))
     
